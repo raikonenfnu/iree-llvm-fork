@@ -15,6 +15,10 @@ namespace mlir {
 /// Creates an instance of `tensor` dialect bufferization pass.
 std::unique_ptr<Pass> createTensorBufferizePass();
 
+/// Creates a pass to wrap tensor.pad ops with scf.if ops to allow handle
+/// padding-elided and padding-needed cases separately.
+std::unique_ptr<Pass> createTensorSplitPaddingPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
