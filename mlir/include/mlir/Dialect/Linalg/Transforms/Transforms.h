@@ -1211,6 +1211,17 @@ protected:
 void populatePadOpVectorizationPatterns(RewritePatternSet &patterns,
                                         PatternBenefit baseBenefit = 1);
 
+/// Populates `patterns` with patterns that vectorize tensor.pad with static
+/// result shape by generating control flows to guard against vector transfer
+/// read ops to make sure they are in bounds.
+///
+/// Such conversions are needed for correctness when the linalg.pad_tensor op
+/// has dynamic low padding values and also beneficial for eventually lowering
+/// to hardware targets without native support for vector transfer read ops with
+/// out of bound semantics.
+void populateVectorizePadOpWithConditionsPatterns(
+    RewritePatternSet &patterns, PatternBenefit baseBenefit = 1);
+
 /// Match and rewrite for the pattern:
 /// ```
 ///    %alloc = ...
