@@ -1312,6 +1312,10 @@ LogicalResult applyStagedPatterns(
     const FrozenRewritePatternSet &stage2Patterns,
     function_ref<LogicalResult(Operation *)> stage3Lambda = nullptr);
 
+//===----------------------------------------------------------------------===//
+// tensor.pad patterns
+//===----------------------------------------------------------------------===//
+
 /// Rewrite extract_slice(pad_tensor(x)) into pad_tensor(extract_slice(x)).
 struct ExtractSliceOfPadTensorSwapPattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
@@ -1337,6 +1341,12 @@ struct ExtractSliceOfPadTensorSwapPattern
 private:
   ControlFn controlFn;
 };
+
+/// Populates patterns to make tensor.pad result shape static if possible.
+/// This can be used after ExtractSliceOfPadTensorSwapPattern to expose static
+/// information for further transformations like vectorization.
+void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
+                                              PatternBenefit benefit = 1);
 
 //===----------------------------------------------------------------------===//
 // Helper classes for type list expansion.

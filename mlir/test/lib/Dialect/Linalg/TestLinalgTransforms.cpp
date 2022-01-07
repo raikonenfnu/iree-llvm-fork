@@ -103,6 +103,11 @@ struct TestLinalgTransforms
       *this, "test-generalize-pad-tensor",
       llvm::cl::desc("Test transform pad tensor by copying with generic ops"),
       llvm::cl::init(false)};
+  Option<bool> testConcretizePadResultShape{
+      *this, "test-concretize-pad-result-shape",
+      llvm::cl::desc(
+          "Test patterns to make tensor.pad result shape static when possible"),
+      llvm::cl::init(false)};
   Option<bool> testSwapSubTensorPadTensor{
       *this, "test-swap-subtensor-padtensor",
       llvm::cl::desc("Test rewrite of subtensor(pad_tensor) into "
@@ -564,6 +569,12 @@ static void applyPadTensorToGenericPatterns(FuncOp funcOp) {
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
+static void applyConcretizeTensorPadResultShapePatterns(FuncOp funcOp) {
+  RewritePatternSet patterns(funcOp.getContext());
+  populateConcretizePadResultShapePatterns(patterns);
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+}
+
 static void applyGeneralizePadTensorPatterns(FuncOp funcOp) {
   RewritePatternSet patterns(funcOp.getContext());
   patterns.add<GeneralizePadOpPattern>(funcOp.getContext());
@@ -712,6 +723,8 @@ void TestLinalgTransforms::runOnOperation() {
     return applyPadTensorToGenericPatterns(getOperation());
   if (testGeneralizePadTensor)
     return applyGeneralizePadTensorPatterns(getOperation());
+  if (testConcretizePadResultShape)
+    return applyConcretizeTensorPadResultShapePatterns(getOperation());
   if (testSwapSubTensorPadTensor)
     return applyExtractSliceOfPadTensorSwapPattern(getOperation());
   if (testTiledLoopPeeling.hasValue())
