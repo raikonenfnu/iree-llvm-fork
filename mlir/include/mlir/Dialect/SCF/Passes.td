@@ -126,4 +126,17 @@ def SCFForToWhileLoop : Pass<"scf-for-to-while", "FuncOp"> {
   }];
 }
 
+def SCFIfRegionExpansion : Pass<"if-region-expansion", "FuncOp"> {
+  let summary = "Pulls ops before and after scf.if into both scf.if regions";
+  let constructor = "mlir::createIfRegionExpansionPass()";
+  let description = [{
+    This pass expands an scf.if op's regions by pulling in ops before and after
+    scf.if op into both regions of the scf.if op. This can be helpful as a
+    prelimiary step to enable further optimizations in both regions, which now
+    does not need to cross region boundaries.
+
+    The scf.if op's parent region should only contain one block.
+  }];
+}
+
 #endif // MLIR_DIALECT_SCF_PASSES
