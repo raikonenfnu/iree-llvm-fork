@@ -7,6 +7,28 @@ on:
   workflow_dispatch:
 
 jobs:
+  advance_main:
+    name: "Advance main"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          ref: main
+
+      - name: Pull upstream main
+        run: |
+          git remote add upstream https://github.com/llvm/llvm-project.git
+          git fetch upstream main
+          git pull --ff-only upstream main
+
+      - name: Pushing changes
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          branch: main
+
   advance_mainline:
     name: "Advance mainline"
     runs-on: ubuntu-20.04
@@ -17,7 +39,7 @@ jobs:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: mainline
 
-      - name: Pull upstream main
+      - name: Pull upstream mainline
         run: |
           git remote add upstream https://github.com/llvm/llvm-project.git
           git fetch upstream main
