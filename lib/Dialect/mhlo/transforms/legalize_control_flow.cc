@@ -92,7 +92,7 @@ void LowerIfOp(mlir::mhlo::IfOp if_op) {
   ReplaceTerminators(&if_op.true_branch(), tail_block, loc, mapper, &builder);
   ReplaceTerminators(&if_op.false_branch(), tail_block, loc, mapper, &builder);
 
-  tail_block->addArguments(if_op.getResultTypes());
+  tail_block->addArguments(if_op.getResultTypes(), loc);
   for (auto it : llvm::zip(if_op.getResults(), tail_block->getArguments()))
     std::get<0>(it).replaceAllUsesWith(std::get<1>(it));
 
@@ -193,7 +193,7 @@ LogicalResult LowerWhileOp(mlir::mhlo::WhileOp while_op) {
   }
 
   // Erase the original while loop.
-  tail_block->addArguments(while_op.getOperandTypes());
+  tail_block->addArguments(while_op.getOperandTypes(), while_op.getLoc());
   for (auto it : llvm::zip(while_op.getResults(), tail_block->getArguments()))
     std::get<0>(it).replaceAllUsesWith(std::get<1>(it));
 
@@ -233,7 +233,7 @@ void LowerCaseOp(mlir::mhlo::CaseOp case_op) {
 
   // The tail block has block arguments for each result.
   TypeRange result_types = case_op.getResultTypes();
-  tail_block->addArguments(result_types);
+  tail_block->addArguments(result_types, loc);
   for (auto it : llvm::zip(case_op->getResults(), tail_block->getArguments())) {
     Value orig_result = std::get<0>(it);
     Value new_value = std::get<1>(it);

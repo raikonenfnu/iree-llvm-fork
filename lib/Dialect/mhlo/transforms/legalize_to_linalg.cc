@@ -38,6 +38,7 @@ limitations under the License.
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -1681,7 +1682,7 @@ struct PadOpConversion : public OpConversionPattern<mhlo::PadOp> {
           loc, std::get<1>(it).getZExtValue()));
     }
     Type result_type = op.getResult().getType();
-    auto pad_tensor_op = linalg::PadTensorOp::createPadScalarOp(
+    auto pad_tensor_op = tensor::createPadScalarOp(
         result_type, adaptor.operand(), padding_val, low, high,
         /*nofold=*/false, loc, rewriter);
     rewriter.replaceOp(op, pad_tensor_op.getResult());
@@ -1718,7 +1719,7 @@ static Value applyPad(Location loc, Value input, ArrayRef<int64_t> pad,
 
   Value padValue = rewriter.create<arith::ConstantOp>(loc, padAttr);
 
-  return linalg::PadTensorOp::createPadScalarOp(
+  return tensor::createPadScalarOp(
       RankedTensorType::get(paddedShape, inputETy), input, padValue, lowIndices,
       highIndices, /*nofold=*/false, loc, rewriter);
 }
@@ -2056,7 +2057,7 @@ struct ReduceWindowOpOnTensorsGenericConversion
         Value zero = rewriter.create<arith::ConstantOp>(
             loc, rewriter.getZeroAttr(
                      input.getType().cast<ShapedType>().getElementType()));
-        auto pad_op = rewriter.create<linalg::PadTensorOp>(
+        auto pad_op = rewriter.create<tensor::PadOp>(
             loc, input, static_lows, static_highs, ValueRange{}, ValueRange{});
 
         SmallVector<Type, 4> block_arg_types;
@@ -2377,8 +2378,8 @@ struct TorchIndexSelectOpConversion
       body_arg_types.push_back(
           block_args.getType().cast<ShapedType>().getElementType());
     }
-    block->addArguments(body_arg_types);
-    block->addArguments(result_type.getElementType());
+    block->addArguments(body_arg_types, loc);
+    block->addArguments(result_type.getElementType(), loc);
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToEnd(block);
 
@@ -2489,7 +2490,7 @@ struct GatherConversion : public OpConversionPattern<mhlo::GatherOp> {
     // Now populate the linalg generic region
     auto* region = &linalgOp.region();
     auto* block = rewriter.createBlock(region, region->end());
-    block->addArguments(resultType.getElementType());
+    block->addArguments(resultType.getElementType(), loc);
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToEnd(block);
 

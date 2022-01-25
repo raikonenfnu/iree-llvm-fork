@@ -187,6 +187,7 @@ add_mlir_library(MhloToLinalg
   MLIRIR
   MLIRPass
   MLIRRewrite
+  MLIRTensorUtils
   MLIRTransformUtils
 )
 
