@@ -1242,3 +1242,15 @@ func @extract_extract_strided2(%A: vector<2x4xf32>)
  %1 = vector.extract %0[0] : vector<1x4xf32>
  return %1 : vector<4xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @shuffle_1d
+//       CHECK:   %[[V:.+]] = arith.constant dense<[3, 2, 5, 1]> : vector<4xi32>
+//       CHECK:   return %[[V]]
+func @shuffle_1d() -> vector<4xi32> {
+  %v0 = arith.constant dense<[0, 1, 2]> : vector<3xi32>
+  %v1 = arith.constant dense<[3, 4, 5]> : vector<3xi32>
+  %shuffle = vector.shuffle %v0, %v1 [3, 2, 5, 1] : vector<3xi32>, vector<3xi32>
+  return %shuffle : vector<4xi32>
+}
