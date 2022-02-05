@@ -24,6 +24,7 @@
 #include "mlir/Parser.h"
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
@@ -416,6 +417,22 @@ void FillOp::getEffects(
                          SideEffects::DefaultResource::get());
 }
 
+/// Gets the given `attrOrValue` as an index value by creating constant ops
+/// for attributes.
+static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
+                             Location loc) {
+  IntegerAttr attr;
+  if (Value val = attrOrValue.dyn_cast<Value>()) {
+    if (val.getType().isIndex())
+      return val;
+    matchPattern(val, m_Constant(&attr));
+  } else {
+    attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+  }
+  return builder.createOrFold<arith::ConstantIndexOp>(
+      loc, attr.getValue().getSExtValue());
+}
+
 namespace {
 
 /// Fold linalg.fill -> tensor.expand/collapse_shape chain.
@@ -441,12 +458,68 @@ struct FoldFillWithTensorReshape : OpRewritePattern<TensorReshapeOp> {
   }
 };
 
+/// Fold tensor.pad(linalg.fill) into linalg.fill if the padding value and the
+/// filling value are the same.
+struct FoldFillWithPad final : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    auto fillOp = padOp.source().getDefiningOp<linalg::FillOp>();
+    if (!fillOp)
+      return failure();
+
+    // We can only fold if the padding value is the same as the original
+    // filling value.
+    Value padValue = padOp.getConstantPaddingValue();
+    if (!padValue || fillOp.value() != padValue)
+      return failure();
+
+    auto sourceType = fillOp.output().getType().cast<TensorType>();
+    auto resultType = padOp.getResultType();
+
+    SmallVector<Value, 4> dynamicDims;
+    dynamicDims.resize(sourceType.getRank());
+    for (int i = 0, e = sourceType.getRank(); i < e; ++i) {
+      if (resultType.isDynamicDim(i))
+        dynamicDims[i] = rewriter.createOrFold<tensor::DimOp>(
+            fillOp.output().getLoc(), fillOp.output(), i);
+    }
+
+    Location loc = padOp.getLoc();
+    SmallVector<OpFoldResult> lowPads = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highPads = padOp.getMixedHighPad();
+
+    AffineExpr sym0, sym1, sym2;
+    bindSymbols(getContext(), sym0, sym1, sym2);
+    auto addMap = AffineMap::get(0, 3, {sym0 + sym1 + sym2}, getContext());
+    for (int i = 0, e = sourceType.getRank(); i < e; ++i) {
+      if (resultType.isDynamicDim(i)) {
+        Value lowPad = getAsIndexValue(lowPads[i], rewriter, loc);
+        Value highPad = getAsIndexValue(highPads[i], rewriter, loc);
+        dynamicDims[i] = rewriter.create<AffineApplyOp>(
+            loc, addMap, ValueRange{lowPad, dynamicDims[i], highPad});
+      }
+    }
+
+    auto dims = llvm::to_vector<4>(
+        llvm::make_filter_range(dynamicDims, [](Value v) { return v; }));
+    auto initOp = rewriter.create<InitTensorOp>(
+        loc, dims, padOp.getResultType().getShape(),
+        padOp.getResultType().getElementType());
+
+    rewriter.replaceOpWithNewOp<FillOp>(padOp, padValue, initOp);
+    return success();
+  }
+};
+
 } // namespace
 
 void FillOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *context) {
-  results.add<FoldFillWithTensorReshape<tensor::CollapseShapeOp>,
-              FoldFillWithTensorReshape<tensor::ExpandShapeOp>>(context);
+  results
+      .add<FoldFillWithPad, FoldFillWithTensorReshape<tensor::CollapseShapeOp>,
+           FoldFillWithTensorReshape<tensor::ExpandShapeOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
