@@ -116,6 +116,8 @@ ParseResult ExecuteRegionOp::parse(OpAsmParser &parser,
 }
 
 void ExecuteRegionOp::print(OpAsmPrinter &p) {
+  if (getRegion(0).empty())
+    return;
   p.printOptionalArrowTypeList(getResultTypes());
 
   p << ' ';
