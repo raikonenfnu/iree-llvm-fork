@@ -116,6 +116,8 @@ static ParseResult parseExecuteRegionOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, ExecuteRegionOp op) {
+  if(op->getRegion(0).empty())
+    return;
   p.printOptionalArrowTypeList(op.getResultTypes());
 
   p << ' ';
